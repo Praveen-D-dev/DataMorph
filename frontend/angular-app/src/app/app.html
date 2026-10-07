@@ -1,0 +1,33 @@
+<div class="app-shell">
+  <!-- Dynamic Ambient Wallpaper Layer -->
+  <div
+    class="app-shell-bg"
+    [style.background]="themeService.getBackgroundStyle()"
+  ></div>
+
+  <!-- Ambient Scrim / Blur Overlay to maintain crystal-clear glass contrast -->
+  <div
+    class="app-shell-scrim"
+    [style.opacity]="themeService.wallpaperImage() ? themeService.wallpaperOpacity() : 0.4"
+    [style.backdropFilter]="'blur(' + themeService.wallpaperBlur() + 'px)'"
+    [style.webkitBackdropFilter]="'blur(' + themeService.wallpaperBlur() + 'px)'"
+  ></div>
+
+  <!-- Foreground App Container -->
+  <div class="app-shell-content">
+    <!-- Top Global Header: [☰] [DataMorph] ... [⚙ Settings] [🎙 Voice] -->
+    <app-header></app-header>
+
+    <!-- Desktop Main Body Area -->
+    <div class="app-body">
+      <!-- Dynamic Left Navigation Sidebar -->
+      <app-sidebar></app-sidebar>
+
+      <!-- Main Content Workspace -->
+      <main class="main-workspace">
+        <app-dashboard-container></app-dashboard-container>
+      </main>
+    </div>
+  </div>
+</div>
+
