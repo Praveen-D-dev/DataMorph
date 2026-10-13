@@ -57,7 +57,12 @@ async function runIntegrationTest() {
   const voiceJson = await voiceRes.json();
   console.log(`[6] Voice Command processed:`);
   console.log(`    Action: ${voiceJson.data.action_summary}`);
-  console.log(`    Mutated Primary Chart: ${voiceJson.data.updated_dashboard.visualizations[0].chart_type}`);
+  if (listJson.status !== "success") throw new Error(`List failed: ${listJson.error?.message}`);
+  if (profileJson.status !== "success") throw new Error(`Profile failed: ${profileJson.error?.message}`);
+  if (dashJson.status !== "success") throw new Error(`Dashboard failed: ${dashJson.error?.message}`);
+  if (cmdJson.status !== "success") throw new Error(`Command failed: ${cmdJson.error?.message}`);
+  if (!cmdJson.data?.updated_dashboard?.active_filters) throw new Error("Expected active_filters on dashboard");
+  if (voiceJson.status !== "success") throw new Error(`Voice command failed: ${voiceJson.error?.message}`);
 
   console.log("=== All Integration Tests PASSED Successfully! ===");
 }

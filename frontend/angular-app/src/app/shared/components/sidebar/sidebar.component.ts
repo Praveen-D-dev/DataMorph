@@ -170,11 +170,11 @@ import { NavigationSection } from "../../../core/models/dashboard.model";
           </button>
         }
 
-        <!-- Hidden Native File Input: Strictly CSV, XLSX, and XLS -->
+        <!-- Hidden Native File Input: CSV, XLSX, XLS, and Parquet -->
         <input
           #fileInput
           type="file"
-          accept=".csv,.xlsx,.xls"
+          accept=".csv,.xlsx,.xls,.parquet"
           (change)="onFileSelected($event)"
           hidden
         />

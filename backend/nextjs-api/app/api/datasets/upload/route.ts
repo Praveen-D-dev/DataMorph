@@ -19,6 +19,8 @@ function getProjectRoot(): string {
   return path.resolve(process.cwd(), "..", "..");
 }
 
+const MAX_FILE_SIZE = 100 * 1024 * 1024; // 100 MB
+
 export async function POST(req: NextRequest) {
   const startTime = Date.now();
   try {
@@ -29,8 +31,12 @@ export async function POST(req: NextRequest) {
       return apiError("No file provided in request", "ERR_MISSING_FILE", 400);
     }
 
-    const filename = file.name;
-    const ext = path.extname(filename).toLowerCase();
+    if (file.size > MAX_FILE_SIZE) {
+      return apiError("File exceeds maximum allowed upload size of 100MB", "ERR_FILE_TOO_LARGE", 400);
+    }
+
+    const rawFilename = path.basename(file.name);
+    const ext = path.extname(rawFilename).toLowerCase();
     const supportedTypes = [".csv", ".parquet", ".xlsx", ".xls"];
     if (!supportedTypes.includes(ext)) {
       return apiError(
@@ -40,11 +46,24 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Sanitize base filename to prevent path traversal or filesystem quirks
+    const baseName = path.basename(rawFilename, ext).replace(/[^a-zA-Z0-9_-]/g, "_");
+    const safeFilename = `${baseName || "dataset"}${ext}`;
+
     const bytes = await file.arrayBuffer();
+    if (bytes.byteLength > MAX_FILE_SIZE) {
+      return apiError("File exceeds maximum allowed upload size of 100MB", "ERR_FILE_TOO_LARGE", 400);
+    }
     const buffer = Buffer.from(bytes);
 
     // Compute SHA-256 hash
     const sha256Hash = crypto.createHash("sha256").update(buffer).digest("hex");
+
+    // Deduplicate: if an identical dataset already exists and its file is present on disk, return existing record
+    const existingDataset = await DatabaseService.getDatasetByHash(sha256Hash);
+    if (existingDataset && fs.existsSync(existingDataset.storage_path)) {
+      return apiSuccess(existingDataset, 200, Date.now() - startTime);
+    }
 
     // Local storage path using robust project root
     const uploadDir = path.join(getProjectRoot(), "datasets", "uploads");
@@ -53,7 +72,15 @@ export async function POST(req: NextRequest) {
     }
 
     const datasetId = uuidv4();
-    const targetPath = path.join(uploadDir, `${datasetId}_${filename}`);
+    const targetPath = path.join(uploadDir, `${datasetId}_${safeFilename}`);
+
+    // Strictly verify target path is inside uploads directory
+    const resolvedTarget = path.resolve(targetPath);
+    const resolvedUploadDir = path.resolve(uploadDir);
+    if (!resolvedTarget.startsWith(resolvedUploadDir + path.sep)) {
+      return apiError("Invalid filename or target path", "ERR_INVALID_PATH", 400);
+    }
+
     fs.writeFileSync(targetPath, buffer);
 
     // Read preliminary row and column counts (simple CSV inspection; Excel/Parquet will be profiled by AI Engine)
@@ -70,7 +97,7 @@ export async function POST(req: NextRequest) {
 
     const datasetRecord: DatasetRecord = {
       id: datasetId,
-      filename,
+      filename: rawFilename,
       storage_path: targetPath,
       file_size_bytes: buffer.length,
       row_count: rowCount,

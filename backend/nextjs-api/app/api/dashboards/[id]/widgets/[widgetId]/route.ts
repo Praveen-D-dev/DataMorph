@@ -68,6 +68,22 @@ export async function PUT(
   }
 }
 
+function computeLayoutGrid(nCharts: number) {
+  const spans = [2, 1, 1, 1, 1, 2, 1, 1];
+  const grid = [];
+  for (let i = 0; i < nCharts; i++) {
+    const span = spans[i % spans.length];
+    grid.push({
+      viz_index: i,
+      row: Math.floor(i / 2) + 1,
+      col: (i % 2) + 1,
+      col_span: span,
+      row_span: 1
+    });
+  }
+  return grid;
+}
+
 export async function DELETE(
   req: NextRequest,
   { params }: { params: { id: string; widgetId: string } }
@@ -81,9 +97,11 @@ export async function DELETE(
     const visualizations = (dashboard.visualizations || []).filter(
       (w: any) => w.id !== params.widgetId
     );
+    const layout_grid = computeLayoutGrid(visualizations.length);
     dashboard.visualizations = visualizations;
+    dashboard.layout_grid = layout_grid;
 
-    await DatabaseService.updateDashboard(params.id, { visualizations });
+    await DatabaseService.updateDashboard(params.id, { visualizations, layout_grid });
 
     return apiSuccess({ removedWidgetId: params.widgetId, dashboard });
   } catch (err: any) {

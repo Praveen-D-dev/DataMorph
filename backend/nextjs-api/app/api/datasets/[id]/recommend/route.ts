@@ -1,7 +1,12 @@
 import { NextRequest } from "next/server";
+import { z } from "zod";
 import { DatabaseService } from "@/services/database.service";
 import { PythonBridgeService } from "@/services/python-bridge.service";
 import { apiSuccess, apiError } from "@/utils/response";
+
+const recommendSchema = z.object({
+  topK: z.coerce.number().int().min(1).max(50).default(10)
+});
 
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   const startTime = Date.now();
@@ -14,7 +19,10 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     let topK = 10;
     try {
       const body = await req.json();
-      if (body.topK) topK = parseInt(body.topK);
+      const parseResult = recommendSchema.safeParse(body);
+      if (parseResult.success) {
+        topK = parseResult.data.topK;
+      }
     } catch {}
 
     const recommendations = await PythonBridgeService.recommendVisualizations(dataset.storage_path, topK);

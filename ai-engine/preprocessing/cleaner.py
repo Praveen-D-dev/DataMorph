@@ -15,8 +15,9 @@ class DataCleaner:
         for col, col_type in types.items():
             if col_type in ("numeric_continuous", "numeric_discrete"):
                 s = pd.to_numeric(df_opt[col], errors="coerce")
-                if col_type == "numeric_discrete" and s.dropna().apply(float.is_integer).all():
-                    s_min, s_max = s.min(), s.max()
+                non_null = s.dropna()
+                if col_type == "numeric_discrete" and len(non_null) > 0 and np.all(np.equal(np.mod(non_null.values, 1), 0)):
+                    s_min, s_max = non_null.min(), non_null.max()
                     if s_min >= -32768 and s_max <= 32767:
                         df_opt[col] = s.astype("Int16")
                     elif s_min >= -2147483648 and s_max <= 2147483647:

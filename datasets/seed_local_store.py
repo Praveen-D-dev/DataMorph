@@ -29,7 +29,7 @@ for filename, rel_path in samples:
     datasets[ds_id] = {
         "id": ds_id,
         "filename": filename,
-        "storage_path": abs_path,
+        "storage_path": rel_path.replace("\\", "/"),
         "file_size_bytes": len(content),
         "row_count": row_count,
         "column_count": col_count,

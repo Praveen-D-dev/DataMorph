@@ -20,3 +20,12 @@ export async function GET() {
     return apiError(err.message, "ERR_PREFERENCE", 500);
   }
 }
+
+export async function DELETE() {
+  try {
+    await DatabaseService.resetPreferences();
+    return apiSuccess({ message: "Preferences reset successfully" });
+  } catch (err: any) {
+    return apiError(err.message, "ERR_PREFERENCE", 500);
+  }
+}

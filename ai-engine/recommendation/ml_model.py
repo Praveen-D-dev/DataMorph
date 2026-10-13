@@ -1,5 +1,4 @@
 import os
-import joblib
 import numpy as np
 from sklearn.ensemble import RandomForestClassifier
 from typing import Dict, List, Optional
@@ -11,22 +10,12 @@ class MLRecommendationModel:
     """
     Lightweight Scikit-learn Random Forest model trained on tabular visualization
     meta-features to predict optimal chart category probabilities offline.
+    Initialized in-memory with deterministic statistical priors to ensure safe,
+    version-independent execution without unpickling binary artifacts.
     """
 
     def __init__(self, model_path: Optional[str] = None):
-        self.model_path = model_path or os.path.join(os.path.dirname(__file__), "chart_ranker.joblib")
         self.model: Optional[RandomForestClassifier] = None
-        self._load_or_train()
-
-    def _load_or_train(self):
-        if os.path.exists(self.model_path):
-            try:
-                self.model = joblib.load(self.model_path)
-                return
-            except Exception:
-                pass
-        
-        # Train baseline model offline with synthetic visualization benchmark distribution
         self._train_baseline_model()
 
     def _train_baseline_model(self):
@@ -68,10 +57,6 @@ class MLRecommendationModel:
         rf = RandomForestClassifier(n_estimators=30, max_depth=6, random_state=42)
         rf.fit(np.array(X_train), np.array(y_train))
         self.model = rf
-        try:
-            joblib.dump(rf, self.model_path)
-        except Exception:
-            pass
 
     def predict_chart_probabilities(self, feature_vector: List[float]) -> Dict[str, float]:
         if self.model is None:

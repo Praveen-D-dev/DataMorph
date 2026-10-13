@@ -268,6 +268,8 @@ import { DatasetService } from "../../../core/services/dataset.service";
     .tag-pie { background: rgba(236, 72, 153, 0.15); color: #f472b6; border: 1px solid rgba(236, 72, 153, 0.3); }
     .tag-scatter { background: rgba(245, 158, 11, 0.15); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.3); }
     .tag-area { background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3); }
+    .tag-box, .tag-boxplot { background: rgba(168, 85, 247, 0.15); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.3); }
+    .tag-heatmap { background: rgba(249, 115, 22, 0.15); color: #fb923c; border: 1px solid rgba(249, 115, 22, 0.3); }
 
     .agg-badge {
       font-size: 0.62rem;
@@ -648,126 +650,19 @@ export class ChartCardComponent implements OnInit, OnChanges, OnDestroy {
 
   private buildFallbackOptions(): any {
     const viz = this.viz as any;
-    const chartType = (viz.chart_type || viz.type || "bar").toLowerCase();
-    const accent = viz.accent_color || "#0284c7";
-    const labels = viz.labels || ["10", "40", "80", "120"];
-    const values = viz.data || (viz.datasets?.[0]?.data) || [42, 68, 105, 28, 85, 65];
-
-    if (chartType === "area" || chartType === "line") {
-      return {
-        backgroundColor: "transparent",
-        tooltip: { trigger: "axis" },
-        grid: { top: "15%", left: "5%", right: "5%", bottom: "12%", containLabel: true },
-        xAxis: {
-          type: "category",
-          data: labels,
-          axisLine: { lineStyle: { color: "rgba(255, 255, 255, 0.15)" } },
-          axisLabel: { color: "var(--text-muted, #94a3b8)" }
-        },
-        yAxis: {
-          type: "value",
-          splitLine: { lineStyle: { color: "rgba(255, 255, 255, 0.05)" } },
-          axisLabel: { color: "var(--text-muted, #94a3b8)" }
-        },
-        series: [{
-          name: viz.title || "Value",
-          type: "line",
-          smooth: true,
-          showSymbol: false,
-          data: values,
-          lineStyle: { width: 3, color: accent },
-          areaStyle: chartType === "area" ? {
-            color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-              { offset: 0, color: `${accent}77` },
-              { offset: 1, color: `${accent}05` }
-            ])
-          } : undefined
-        }]
-      };
-    }
-
-    if (chartType === "donut" || chartType === "pie") {
-      const pieData = labels.map((l: string, i: number) => ({
-        name: l,
-        value: values[i] ?? 10
-      }));
-      return {
-        backgroundColor: "transparent",
-        tooltip: { trigger: "item" },
-        legend: {
-          orient: "vertical",
-          right: "5%",
-          top: "center",
-          textStyle: { color: "var(--text-secondary, #94a3b8)", fontSize: 11 }
-        },
-        series: [{
-          type: "pie",
-          radius: chartType === "donut" ? ["52%", "76%"] : "70%",
-          center: ["38%", "50%"],
-          avoidLabelOverlap: false,
-          label: { show: false },
-          data: pieData
-        }]
-      };
-    }
-
-    if (chartType === "progress_milestone" || chartType === "progress") {
-      return {
-        backgroundColor: "transparent",
-        tooltip: { show: false },
-        grid: { top: "25%", left: "10%", right: "10%", bottom: "25%" },
-        xAxis: { type: "value", max: 100, show: false },
-        yAxis: { type: "category", data: ["Progress"], show: false },
-        series: [
-          {
-            type: "bar",
-            barWidth: 20,
-            showBackground: true,
-            backgroundStyle: { color: "rgba(255, 255, 255, 0.08)", borderRadius: 10 },
-            itemStyle: {
-              borderRadius: 10,
-              color: new echarts.graphic.LinearGradient(0, 0, 1, 0, [
-                { offset: 0, color: "#0284c7" },
-                { offset: 1, color: "#38bdf8" }
-              ])
-            },
-            data: [72]
-          }
-        ]
-      };
-    }
-
-    // Default Bar Chart with Background Track and Pill Cap
     return {
       backgroundColor: "transparent",
-      tooltip: { trigger: "axis" },
-      grid: { top: "15%", left: "5%", right: "5%", bottom: "12%", containLabel: true },
-      xAxis: {
-        type: "category",
-        data: labels,
-        axisLine: { lineStyle: { color: "rgba(255, 255, 255, 0.15)" } },
-        axisLabel: { color: "var(--text-muted, #94a3b8)" }
+      title: {
+        text: viz.title || "No data points available",
+        subtext: "Waiting for profile aggregation...",
+        left: "center",
+        top: "middle",
+        textStyle: { color: "var(--text-muted, #94a3b8)", fontSize: 13, fontWeight: 500 },
+        subtextStyle: { color: "rgba(148, 163, 184, 0.6)", fontSize: 11 }
       },
-      yAxis: {
-        type: "value",
-        splitLine: { lineStyle: { color: "rgba(255, 255, 255, 0.05)" } },
-        axisLabel: { color: "var(--text-muted, #94a3b8)" }
-      },
-      series: [{
-        name: viz.title || "Visits",
-        type: "bar",
-        barWidth: "38%",
-        showBackground: true,
-        backgroundStyle: {
-          color: "rgba(255, 255, 255, 0.05)",
-          borderRadius: [6, 6, 0, 0]
-        },
-        itemStyle: {
-          color: accent,
-          borderRadius: [6, 6, 0, 0]
-        },
-        data: values
-      }]
+      xAxis: { type: "category", data: [], show: false },
+      yAxis: { type: "value", show: false },
+      series: []
     };
   }
 

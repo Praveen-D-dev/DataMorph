@@ -16,9 +16,9 @@ export class VoiceService {
   transcript = signal<string>("");
   error = signal<string | null>(null);
 
-  // Speech Synthesis (Text-to-Speech) signals
+  // Speech Synthesis (Text-to-Speech) signals - defaulted to false for privacy & non-intrusiveness
   isSpeaking = signal<boolean>(false);
-  speechEnabled = signal<boolean>(true);
+  speechEnabled = signal<boolean>(false);
   voiceRate = signal<number>(1.0);
   voiceVolume = signal<number>(1.0);
   lastSpokenText = signal<string>("");
@@ -89,16 +89,16 @@ export class VoiceService {
       const voices = this.synth.getVoices();
       if (!voices || voices.length === 0) return;
 
-      // Prefer high-clarity natural voices
+      // Prefer high-clarity local system voices (Windows / macOS / Linux)
       const preferred = voices.find(
         (v) =>
           v.lang.startsWith("en") &&
-          (v.name.includes("Google") ||
-            v.name.includes("Natural") ||
+          (v.name.includes("Natural") ||
             v.name.includes("Jenny") ||
             v.name.includes("David") ||
             v.name.includes("Zira") ||
-            v.name.includes("Samantha"))
+            v.name.includes("Samantha") ||
+            v.name.includes("Alex"))
       );
 
       this.selectedVoice = preferred || voices.find((v) => v.lang.startsWith("en")) || voices[0];
@@ -180,9 +180,15 @@ export class VoiceService {
    * "Okay, now I understand your vision. [Action summary]"
    */
   speakVisionConfirmation(actionSummary?: string) {
-    const prefix = "Okay, now I understand your vision.";
-    const fullText = actionSummary ? `${prefix} ${actionSummary}` : prefix;
-    this.speak(fullText);
+    if (!actionSummary) return;
+    const lower = actionSummary.toLowerCase();
+    const isErrorOrNoop = lower.includes("not recognized") || lower.includes("could not") || lower.includes("unrecognized") || lower.includes("no chart found");
+    if (!isErrorOrNoop) {
+      const prefix = "Okay, now I understand your vision.";
+      this.speak(`${prefix} ${actionSummary}`);
+    } else {
+      this.speak(actionSummary);
+    }
   }
 
   stopSpeaking() {

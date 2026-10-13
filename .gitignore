@@ -48,3 +48,11 @@ Thumbs.db
 # Testing coverage
 coverage/
 .pytest_cache/
+
+# User datasets and uploads (Privacy & Zero-leakage)
+datasets/uploads/*
+!datasets/uploads/.gitkeep
+database/local_store.json
+
+# Binary model artifacts
+*.joblib

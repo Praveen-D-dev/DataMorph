@@ -192,11 +192,11 @@ import { Visualization } from "../../../core/models/dashboard.model";
             </p>
           </div>
 
-          <!-- Clean Drag & Drop Zone: Strictly CSV and XLSX (Requirement 35) -->
+          <!-- Clean Drag & Drop Zone: CSV, XLSX, XLS, and Parquet -->
           <label class="clean-dropzone glass-card">
             <input
               type="file"
-              accept=".csv,.xlsx,.xls"
+              accept=".csv,.xlsx,.xls,.parquet"
               (change)="onFileSelected($event)"
               hidden
             />
@@ -207,12 +207,13 @@ import { Visualization } from "../../../core/models/dashboard.model";
                 <line x1="12" y1="3" x2="12" y2="15"></line>
               </svg>
             </div>
-            <span class="drop-text">Drag & drop CSV or XLSX file</span>
+            <span class="drop-text">Drag & drop CSV, XLSX, or Parquet file</span>
             <span class="drop-sub">or click to browse your local filesystem</span>
             <div class="format-tags">
               <span class="tag">CSV</span>
               <span class="tag">XLSX</span>
               <span class="tag">XLS</span>
+              <span class="tag">PARQUET</span>
             </div>
           </label>
 
@@ -825,7 +826,10 @@ export class DashboardContainerComponent {
 
   loadDemoDataset(filename: string) {
     fetch(`/datasets/samples/${filename}`)
-      .then((res) => res.blob())
+      .then((res) => {
+        if (!res.ok) throw new Error(`Asset not found: HTTP ${res.status}`);
+        return res.blob();
+      })
       .then((blob) => {
         const file = new File([blob], filename, { type: "text/csv" });
         this.datasetService.uploadDataset(file).subscribe();

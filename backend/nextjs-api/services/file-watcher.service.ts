@@ -88,6 +88,21 @@ export class FileWatcherService {
       // Regenerate fresh dashboard with updated data
       const updatedDashConfig = await PythonBridgeService.generateDashboard(filePath);
 
+      // Persist regenerated dashboard
+      let activeDashboard = await DatabaseService.getDashboardByDatasetId(datasetId);
+      if (activeDashboard) {
+        activeDashboard = {
+          ...activeDashboard,
+          kpis: updatedDashConfig.kpis,
+          visualizations: updatedDashConfig.visualizations,
+          filters: updatedDashConfig.filters,
+          active_filters: {},
+          layout_grid: updatedDashConfig.layout_grid,
+          updated_at: new Date().toISOString()
+        };
+        await DatabaseService.updateDashboard(activeDashboard.id, activeDashboard);
+      }
+
       let changeType: FileWatchCheckResult["status"] = "data_updated";
       let summaryMsg = "Dataset contents updated — refreshed dashboard metrics.";
 
@@ -110,14 +125,10 @@ export class FileWatcherService {
         addedColumns: addedCols,
         removedColumns: removedCols,
         newHash,
-        updatedDashboard: updatedDashConfig
+        updatedDashboard: activeDashboard || updatedDashConfig
       };
     } catch (err: any) {
-      return {
-        status: "unchanged",
-        message: `Error inspecting file: ${err.message}`,
-        hasChanged: false
-      };
+      throw new Error(`File watcher update failed: ${err.message}`);
     }
   }
 }

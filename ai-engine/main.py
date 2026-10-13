@@ -30,6 +30,7 @@ def main():
     cmd_parser.add_argument("--text", required=True, help="Command text")
     cmd_parser.add_argument("--file", required=True, help="Path to dataset file")
     cmd_parser.add_argument("--dashboard_file", default=None, help="Path to current dashboard JSON")
+    cmd_parser.add_argument("--dashboard_json", default=None, help="Inline JSON string of current dashboard")
 
     args = parser.parse_args()
 
@@ -56,13 +57,19 @@ def main():
         elif args.command == "command":
             profile = DataProfiler.profile_dataset(args.file)
             dash_config = {}
-            if args.dashboard_file:
+            if args.dashboard_json:
+                try:
+                    dash_config = json.loads(args.dashboard_json)
+                except Exception:
+                    dash_config = {}
+            elif args.dashboard_file and os.path.exists(args.dashboard_file):
                 with open(args.dashboard_file, "r") as f:
                     dash_config = json.load(f)
-            else:
+
+            if not dash_config:
                 dash_config = DashboardGenerator().generate_dashboard(args.file)
 
-            result = CommandProcessor.process_command(args.text, dash_config, profile)
+            result = CommandProcessor.process_command(args.text, dash_config, profile, file_path=args.file)
             print(json.dumps({"status": "success", "data": result}))
 
     except Exception as e:

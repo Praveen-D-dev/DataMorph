@@ -3,6 +3,22 @@ title DataMorph Launcher
 echo ========================================================
 echo        DATAMORPH: AI Adaptive Dashboard Framework       
 echo ========================================================
+echo Checking prerequisites...
+where python >nul 2>nul
+if %errorlevel% neq 0 (
+    echo [ERROR] Python not found on PATH. Please install Python 3.10+ and add it to PATH.
+    pause
+    exit /b 1
+)
+
+where node >nul 2>nul
+if %errorlevel% neq 0 (
+    echo [ERROR] Node.js not found on PATH. Please install Node.js 20+ and add it to PATH.
+    pause
+    exit /b 1
+)
+
+echo Prerequisites verified: Python and Node.js detected.
 echo Starting all 3 local service components...
 echo.
 

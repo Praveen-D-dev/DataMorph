@@ -25,12 +25,17 @@ function getPythonExecutable(): string {
   if (process.env.PYTHON_PATH && fs.existsSync(process.env.PYTHON_PATH)) {
     return process.env.PYTHON_PATH;
   }
-  // Check common Windows Python310 path if present
-  const winPy310 = "C:\\Users\\hp\\AppData\\Local\\Programs\\Python\\Python310\\python.exe";
-  if (fs.existsSync(winPy310)) {
-    return winPy310;
+  const root = getProjectRoot();
+  const candidates = [
+    path.join(root, ".venv", "Scripts", "python.exe"),
+    path.join(root, ".venv", "bin", "python"),
+    path.join(root, "venv", "Scripts", "python.exe"),
+    path.join(root, "venv", "bin", "python")
+  ];
+  for (const c of candidates) {
+    if (fs.existsSync(c)) return c;
   }
-  return "python";
+  return process.platform === "win32" ? "python" : "python3";
 }
 
 export class PythonBridgeService {
@@ -201,6 +206,10 @@ export class PythonBridgeService {
       dashboard
     });
     if (httpResult !== null) return httpResult;
-    return this.executePython<any>(["command", "--text", text, "--file", filePath]);
+    const args = ["command", "--text", text, "--file", filePath];
+    if (dashboard) {
+      args.push("--dashboard_json", JSON.stringify(dashboard));
+    }
+    return this.executePython<any>(args);
   }
 }

@@ -4,7 +4,7 @@ import { VoiceService } from "./voice.service";
 import { Dataset, DatasetProfile } from "../models/dataset.model";
 import { Dashboard, Visualization } from "../models/dashboard.model";
 import { CommandResult } from "../models/command.model";
-import { Observable, tap, of } from "rxjs";
+import { Observable, tap, of, throwError, Subscription, switchMap, EMPTY } from "rxjs";
 
 export interface AIPipelineStep {
   id: string;
@@ -96,14 +96,45 @@ export class DatasetService {
     );
   }
 
+  private pipelineSub: Subscription | null = null;
+
   selectDataset(dataset: Dataset) {
     if (this.activeDataset()?.id === dataset.id) return;
+
+    if (this.pipelineSub) {
+      this.pipelineSub.unsubscribe();
+      this.pipelineSub = null;
+    }
+
     this.activeDataset.set(dataset);
     this.activeProfile.set(null);
     this.activeDashboard.set(null);
     this.activeSectionId.set("main");
     this.recommendations.set([]);
-    this.runAIPipeline(dataset);
+    this.resetPipelineSteps();
+
+    // First attempt to load existing saved dashboard (prevents duplicate dashboard generations)
+    this.isLoading.set(true);
+    this.statusMessage.set("Loading saved dashboard...");
+    this.api.get<Dashboard>(`/datasets/${dataset.id}/dashboard`).subscribe({
+      next: (existingDash) => {
+        this.activeDashboard.set(existingDash);
+        // Load profile
+        this.api.get<any>(`/datasets/${dataset.id}`).subscribe({
+          next: (dsInfo) => {
+            if (dsInfo?.profile) this.activeProfile.set(dsInfo.profile);
+          }
+        });
+        this.aiPipelineSteps.update((steps) => steps.map((s) => ({ ...s, status: "done" })));
+        this.isLoading.set(false);
+        this.isAnalyzing.set(false);
+        this.statusMessage.set(`Loaded dashboard: ${existingDash.title}`);
+      },
+      error: () => {
+        // No dashboard generated yet for this dataset: run fresh AI synthesis pipeline
+        this.runAIPipeline(dataset);
+      }
+    });
   }
 
   retryCurrentAnalysis() {
@@ -133,6 +164,11 @@ export class DatasetService {
   }
 
   private runAIPipeline(dataset: Dataset) {
+    if (this.pipelineSub) {
+      this.pipelineSub.unsubscribe();
+      this.pipelineSub = null;
+    }
+
     this.pipelineError.set(null);
     this.isAnalyzing.set(true);
     this.isLoading.set(true);
@@ -140,46 +176,39 @@ export class DatasetService {
     this.updateStepStatus("validate", "done");
     this.updateStepStatus("types", "active");
 
-    this.profileCurrentDataset().subscribe({
-      next: (profile) => {
+    this.pipelineSub = this.api.post<DatasetProfile>(`/datasets/${dataset.id}/profile`, { forceRecalculate: false }).pipe(
+      switchMap((profile) => {
+        if (this.activeDataset()?.id !== dataset.id) return EMPTY;
+        this.activeProfile.set(profile);
         this.updateStepStatus("types", "done");
         this.updateStepStatus("profile", "done");
         this.updateStepStatus("domains", "active");
-
-        // Simulate short progressive visual confirmation
-        setTimeout(() => {
-          this.updateStepStatus("domains", "done");
-          this.updateStepStatus("candidates", "active");
-
-          setTimeout(() => {
-            this.updateStepStatus("candidates", "done");
-            this.updateStepStatus("ranking", "active");
-
-            this.generateDashboardForCurrent().subscribe({
-              next: (dash) => {
-                this.updateStepStatus("ranking", "done");
-                this.updateStepStatus("dashboard", "done");
-                setTimeout(() => {
-                  this.isAnalyzing.set(false);
-                  this.isLoading.set(false);
-                  this.voice.speakVisionConfirmation(
-                    `Dashboard created with ${dash.visualizations?.length || 0} visualizations.`
-                  );
-                }, 400);
-              },
-              error: (err) => {
-                this.isAnalyzing.set(false);
-                this.isLoading.set(false);
-                this.pipelineError.set(`Dashboard generation error: ${err.message}`);
-              }
-            });
-          }, 350);
-        }, 350);
-      },
-      error: (err) => {
+        this.updateStepStatus("candidates", "active");
+        this.statusMessage.set("Synthesizing analytical visualizations & layout...");
+        return this.api.post<Dashboard>(`/datasets/${dataset.id}/dashboard`, {});
+      })
+    ).subscribe({
+      next: (dash) => {
+        if (this.activeDataset()?.id !== dataset.id) return;
+        this.activeDashboard.set(dash);
+        this.activeSectionId.set("main");
+        this.updateStepStatus("domains", "done");
+        this.updateStepStatus("candidates", "done");
+        this.updateStepStatus("ranking", "done");
+        this.updateStepStatus("dashboard", "done");
         this.isAnalyzing.set(false);
         this.isLoading.set(false);
-        this.pipelineError.set(`Data profiling error: ${err.message}`);
+        this.statusMessage.set("");
+        this.voice.speakVisionConfirmation(
+          `Dashboard created with ${dash.visualizations?.length || 0} visualizations.`
+        );
+      },
+      error: (err) => {
+        if (this.activeDataset()?.id !== dataset.id) return;
+        this.isAnalyzing.set(false);
+        this.isLoading.set(false);
+        this.pipelineError.set(`AI pipeline error: ${err.message || "Failed to analyze dataset."}`);
+        this.statusMessage.set(`Pipeline error: ${err.message}`);
       }
     });
   }
@@ -269,17 +298,9 @@ export class DatasetService {
           });
         }
       },
-      error: () => {
-        // Optimistic local update fallback
-        this.activeDashboard.update((d) => {
-          if (!d) return null;
-          return {
-            ...d,
-            visualizations: d.visualizations.map((v) =>
-              v.id === widgetId ? { ...v, ...updates } : v
-            )
-          };
-        });
+      error: (err) => {
+        const msg = err?.error?.message || err?.message || "Invalid column combination or chart type";
+        this.statusMessage.set(`Widget update failed: ${msg}`);
       }
     });
   }
@@ -288,7 +309,12 @@ export class DatasetService {
     const dash = this.activeDashboard();
     if (dash) {
       this.api.delete(`/dashboards/${dash.id}/widgets/${widgetId}`).subscribe({
-        error: () => {}
+        next: () => {
+          this.statusMessage.set("Widget removed from dashboard");
+        },
+        error: (err) => {
+          this.statusMessage.set(`Failed to delete widget: ${err?.message || "server error"}`);
+        }
       });
     }
 
@@ -300,7 +326,6 @@ export class DatasetService {
       };
     });
   }
-
 
   duplicateWidget(widgetId: string) {
     const dash = this.activeDashboard();
@@ -315,42 +340,84 @@ export class DatasetService {
       display_order: dash.visualizations.length
     };
 
+    const newVizList = [...dash.visualizations, copy];
     this.activeDashboard.update((d) => {
       if (!d) return null;
       return {
         ...d,
-        visualizations: [...d.visualizations, copy]
+        visualizations: newVizList
       };
+    });
+
+    // Persist duplicated widget to server
+    this.api.put(`/dashboards/${dash.id}`, { visualizations: newVizList }).subscribe({
+      error: () => {}
     });
   }
 
   toggleWidgetSpan(widgetId: string) {
-    this.activeDashboard.update((dash) => {
-      if (!dash) return null;
+    const dash = this.activeDashboard();
+    if (!dash) return;
+
+    const updated = dash.visualizations.map((v) => {
+      if (v.id === widgetId) {
+        const currentSpan = v.col_span || 1;
+        return { ...v, col_span: currentSpan === 1 ? 2 : 1 };
+      }
+      return v;
+    });
+
+    this.activeDashboard.update((d) => {
+      if (!d) return null;
       return {
-        ...dash,
-        visualizations: dash.visualizations.map((v) => {
-          if (v.id === widgetId) {
-            const currentSpan = v.col_span || 1;
-            return { ...v, col_span: currentSpan === 1 ? 2 : 1 };
-          }
-          return v;
-        })
+        ...d,
+        visualizations: updated
       };
+    });
+
+    // Persist span to server
+    this.api.put(`/dashboards/${dash.id}`, { visualizations: updated }).subscribe({
+      error: () => {}
     });
   }
 
   refreshActiveDataset() {
     const current = this.activeDataset();
-    if (current) {
-      this.runAIPipeline(current);
-    }
+    if (!current) return;
+    this.isLoading.set(true);
+    this.statusMessage.set("Checking local file for modifications...");
+    this.api.post<any>(`/datasets/${current.id}/watch`, {}).subscribe({
+      next: (res) => {
+        if (res?.hasChanged && res?.updatedDashboard) {
+          this.activeDashboard.set(res.updatedDashboard);
+          this.statusMessage.set(res.message || "Dashboard refreshed with updated file data.");
+          this.isLoading.set(false);
+        } else {
+          // If file content hash unchanged, run fresh AI synthesis pipeline
+          this.runAIPipeline(current);
+        }
+      },
+      error: () => {
+        this.runAIPipeline(current);
+      }
+    });
   }
 
   removeActiveDataset() {
     const current = this.activeDataset();
     if (current) {
-      this.datasets.update((prev) => prev.filter((d) => d.id !== current.id));
+      const idToDelete = current.id;
+      // Persist deletion to backend API, unlinking disk files and clearing database entries
+      this.api.delete(`/datasets/${idToDelete}`).subscribe({
+        next: () => {
+          this.statusMessage.set(`Dataset '${current.filename}' and local files removed.`);
+        },
+        error: (err) => {
+          console.warn(`Failed to delete dataset from backend storage:`, err);
+        }
+      });
+
+      this.datasets.update((prev) => prev.filter((d) => d.id !== idToDelete));
       const remaining = this.datasets();
       if (remaining.length > 0) {
         this.selectDataset(remaining[0]);
@@ -365,11 +432,10 @@ export class DatasetService {
 
   private recordPreferenceSignal(fromType: string, toType: string, dimension?: string) {
     this.api.post("/preferences", {
-      interaction_type: "chart_type_replaced",
-      from_chart: fromType,
-      to_chart: toType,
-      dimension_context: dimension || "unknown",
-      timestamp: new Date().toISOString()
+      action: "chart_type_replaced",
+      category: fromType,
+      target: toType,
+      value: dimension || "general"
     }).subscribe({
       error: () => {} // Silent non-blocking preference logging
     });
@@ -377,7 +443,9 @@ export class DatasetService {
 
   executeCommand(commandText: string): Observable<CommandResult> {
     const dash = this.activeDashboard();
-    if (!dash) throw new Error("No active dashboard to adapt");
+    if (!dash) {
+      return throwError(() => new Error("Please select or load a dataset first."));
+    }
 
     this.isLoading.set(true);
     this.statusMessage.set(`Processing command: "${commandText}"...`);

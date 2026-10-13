@@ -27,15 +27,16 @@ import { KpiCard } from "../../../core/models/dashboard.model";
 
       <!-- Bottom Row: Trend badge & Context pill badge -->
       <div class="kpi-footer-row">
-        <!-- Trend indicator -->
+        <!-- Trend indicator (only rendered when genuine trend data exists) -->
         <div 
           class="kpi-trend-pill" 
+          *ngIf="kpi.trend || kpi.change !== undefined"
           [class.trend-up]="kpi.trend_direction === 'up' || kpi.trend === 'up'"
           [class.trend-down]="kpi.trend_direction === 'down' || kpi.trend === 'down'"
           [class.trend-on-gradient]="kpi.card_style === 'gradient' || kpi.variant === 'gradient-electric'"
         >
           <span class="trend-arrow">{{ (kpi.trend_direction === 'up' || kpi.trend === 'up') ? '↗' : '↘' }}</span>
-          <span class="trend-text">{{ kpi.change ? ((kpi.change > 0 ? '+' : '') + kpi.change + '%') : (kpi.trend || '+8%') }}</span>
+          <span class="trend-text">{{ kpi.change ? ((kpi.change > 0 ? '+' : '') + kpi.change + '%') : kpi.trend }}</span>
         </div>
 
         <!-- Pill badge -->

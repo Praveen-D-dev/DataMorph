@@ -4,29 +4,29 @@
 
 DataMorph is a **desktop-first, privacy-oriented, offline-capable adaptive dashboard generation system**.
 
-The user provides an arbitrary structured dataset (CSV, Parquet). DataMorph automatically profiles its statistical topology, generates context-tailored chart recommendations using a hybrid rule-based and machine-learning pipeline, synthesizes an interactive dashboard layout, and enables voice and natural-language adaptation.
+The user provides an arbitrary structured dataset (CSV, XLSX, XLS, Parquet). DataMorph automatically profiles its statistical topology, generates context-tailored chart recommendations using a hybrid rule-based and machine-learning pipeline, synthesizes an interactive dashboard layout, and enables voice and natural-language adaptation.
 
-> **Privacy Statement**: *DataMorph is designed to minimize data exposure by performing core data processing and AI inference locally.*
+> **Privacy Statement**: *DataMorph is designed to minimize data exposure by performing all core data processing, schema profiling, and AI inference strictly locally on your machine with zero external cloud dependencies or telemetry.*
 
 ---
 
 ## Key Capabilities
 
 1. **Autonomous Data Understanding**: Staged schema inspection, semantic type detection, and statistical profiling.
-2. **Hybrid Recommendation Engine**: Knowledge-based Grammar of Graphics rules paired with Scikit-learn ranking.
-3. **Adaptive Dashboard Synthesis**: Dynamically selects KPIs, time-trend charts, distribution plots, and cross-filter parameters tailored to the dataset.
-4. **Natural-Language & Voice Control**: Interactive dashboard mutations driven by local NLU intent and entity parsing.
-5. **Zero Cloud Telemetry**: Raw datasets remain strictly on the local machine; zero external SaaS dependencies.
+2. **Hybrid Recommendation Engine**: Knowledge-based Grammar of Graphics rules paired with Scikit-learn statistical priors.
+3. **Adaptive Dashboard Synthesis**: Dynamically selects real KPIs, trend lines, distribution plots, and cross-filter parameters tailored to the dataset.
+4. **Natural-Language & Voice Control**: Interactive dashboard mutations driven by local NLU intent and regex entity parsing.
+5. **Zero Cloud Telemetry & Offline Capable**: Raw datasets remain strictly on the local machine; local fonts and localhost networking only.
 
 ---
 
 ## Technology Stack
 
-- **Frontend**: Angular 17+ (TypeScript, Standalone Components, Signals)
-- **Visualization**: Apache ECharts 5.5+ (`ngx-echarts`)
-- **Backend API**: Next.js (App Router REST API, Zod validation)
-- **AI / ML Engine**: Python 3.10+ (Pandas, NumPy, Scikit-learn)
-- **Persistence**: PostgreSQL (Metadata, profiles, dashboard specs) + SQLite (Local app state & caching)
+- **Frontend**: Angular 21 (TypeScript, Standalone Components, Signals, Reactive Architecture)
+- **Visualization**: Apache ECharts 6.1+
+- **Backend API**: Next.js 14 (App Router REST API, Zod schema validation)
+- **AI / ML Engine**: Python 3.10+ (Pandas, NumPy, Scikit-learn, PyArrow, OpenPyXL, XLRD)
+- **Persistence**: Embedded offline local storage engine (`database/local_store.json`, zero daemon configuration required) with optional PostgreSQL support.
 
 ---
 
@@ -37,15 +37,17 @@ DataMorph/
 ├── frontend/
 │   └── angular-app/       # Angular desktop presentation UI
 ├── backend/
-│   └── nextjs-api/        # Next.js REST API & orchestration
-├── ai-engine/             # Python profiling, ML ranking & NLU
+│   └── nextjs-api/        # Next.js REST API & Python orchestration
+├── ai-engine/             # Python profiling, ML ranking & NLU microservice
 ├── database/
-│   ├── postgres/          # PostgreSQL schemas and migrations
-│   └── sqlite/            # SQLite local state schemas
+│   ├── postgres/          # Optional PostgreSQL schema
+│   └── local_store.json   # Embedded offline local storage (auto-seeded)
 ├── datasets/
-│   └── samples/           # Benchmark datasets (Sales, Students, etc.)
-├── tests/                 # Unit, integration, and E2E tests
-└── docs/                  # Architectural documentation
+│   ├── samples/           # Benchmark datasets (Sales, Students, etc.)
+│   └── uploads/           # Uploaded user datasets (gitignored)
+├── tests/                 # Unit and regression test suites
+├── run_datamorph.bat      # Windows one-click desktop launcher
+└── run_datamorph.sh       # Linux/macOS launcher script
 ```
 
 ---
@@ -53,26 +55,41 @@ DataMorph/
 ## Quick Start
 
 ### 1. Requirements
-- Node.js 18+ (tested on Node.js 22)
-- Python 3.10+ with `pandas`, `numpy`, `scikit-learn`
-- PostgreSQL 15+ (or Docker)
+- Node.js 20.19+, 22.12+, or 24+
+- Python 3.10+ with pip
 
-### 2. Database Setup
+### 2. Option A: Single-Click Launcher
+On Windows:
+```cmd
+run_datamorph.bat
+```
+On Linux / macOS:
 ```bash
-# Using Docker Compose
-docker compose up -d postgres
+chmod +x run_datamorph.sh
+./run_datamorph.sh
 ```
 
-### 3. Backend Setup
+### 3. Option B: Manual Service Startup
+
+#### Step 1: AI Engine (Port 5005)
+```bash
+cd ai-engine
+pip install -r requirements.txt
+python server.py
+```
+
+#### Step 2: Next.js API (Port 3001)
 ```bash
 cd backend/nextjs-api
 npm install
 npm run dev
 ```
 
-### 4. Frontend Setup
+#### Step 3: Angular Frontend (Port 4200)
 ```bash
 cd frontend/angular-app
 npm install
 npm start
 ```
+
+Open `http://localhost:4200` in your browser. All data processing and dashboard generation runs locally.

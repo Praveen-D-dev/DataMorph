@@ -30,13 +30,16 @@ class DataProfiler:
         file_size = os.path.getsize(file_path)
         file_hash = cls.compute_file_hash(file_path)
 
-        # Stage 1: Load file with optimized types
-        if file_path.endswith((".xlsx", ".xls")):
+        # Stage 1: Load file with optimized types (case-insensitive)
+        lower_path = file_path.lower()
+        if lower_path.endswith((".xlsx", ".xls")):
             df = pd.read_excel(file_path)
-        elif file_path.endswith(".parquet"):
+        elif lower_path.endswith(".parquet"):
             df = pd.read_parquet(file_path)
-        else:
+        elif lower_path.endswith(".csv") or lower_path.endswith(".txt"):
             df = pd.read_csv(file_path)
+        else:
+            raise ValueError(f"Unsupported dataset format '{os.path.basename(file_path)}'. Only CSV, XLSX, XLS, and Parquet are supported.")
 
         row_count, col_count = df.shape
 
