@@ -39,6 +39,7 @@ class CommandProcessor:
         )
 
         mutated_config = dict(dashboard_config)
+        mutated_config.setdefault("active_filters", {})
         visualizations = list(mutated_config.get("visualizations", []))
         resolved_file_path = file_path or profile.get("file_info", {}).get("file_path")
         action_summary = ""
@@ -167,14 +168,24 @@ class CommandProcessor:
 
             # Fallback regex extraction if entity extractor missed
             if not filter_col or not filter_val:
-                match = re.search(r"(?:only|filter|show)\s+(?:for\s+)?([a-zA-Z0-9_-]+)", command_text, re.IGNORECASE)
+                match = re.search(r"(?:only|filter|show)\s+(?:by\s+)?([a-zA-Z0-9_-]+)\s+(?:to\s+|is\s+|as\s+|[=:]\s*)?([a-zA-Z0-9_\s-]+)", command_text, re.IGNORECASE)
                 if match:
-                    candidate_val = match.group(1).strip()
-                    for col, vals in top_values.items():
-                        if any(candidate_val.lower() == str(v).lower() for v in vals):
+                    possible_col = match.group(1).strip()
+                    possible_val = match.group(2).strip()
+                    for col in columns:
+                        if possible_col.lower() == col.lower():
                             filter_col = col
-                            filter_val = candidate_val
+                            filter_val = possible_val
                             break
+                if not filter_col or not filter_val:
+                    match_single = re.search(r"(?:only|filter|show)\s+(?:for\s+)?([a-zA-Z0-9_-]+)", command_text, re.IGNORECASE)
+                    if match_single:
+                        candidate_val = match_single.group(1).strip()
+                        for col, vals in top_values.items():
+                            if any(candidate_val.lower() == str(v).lower() for v in vals):
+                                filter_col = col
+                                filter_val = candidate_val
+                                break
 
             if filter_col and filter_val:
                 active_filters = mutated_config.setdefault("active_filters", {})

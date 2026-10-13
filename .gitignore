@@ -56,3 +56,4 @@ database/local_store.json
 
 # Binary model artifacts
 *.joblib
+*.tsbuildinfo
